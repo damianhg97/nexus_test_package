@@ -1,0 +1,22 @@
+name: nexus_test_package
+description: A simple Flutter/Dart package to test publishing to Nexus Repository.
+version: 0.0.1
+homepage: https://example.com
+
+# Thay URL bên dưới bằng URL thật của bạn trên Nexus
+publish_to: https://nexus-khoadghg97-dev.apps.rm3.7wse.p1.openshiftapps.com/repository/pub-hosted/
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
