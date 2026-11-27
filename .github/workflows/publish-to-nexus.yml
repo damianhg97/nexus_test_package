@@ -1,0 +1,68 @@
+name: Publish to Nexus
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container:
+      image: gmeligio/flutter-android:3.44.9
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate package
+        run: |
+          flutter pub get
+          dart pub publish --dry-run
+
+      - name: Create package archive
+        id: package
+        shell: bash
+        run: |
+          package_name="$(sed -n 's/^name:[[:space:]]*//p' pubspec.yaml)"
+          package_version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml)"
+          publish_url="$(sed -n 's/^publish_to:[[:space:]]*//p' pubspec.yaml | tr -d "\"'")"
+
+          [[ "$publish_url" == https://* ]] || { echo "publish_to must use HTTPS" >&2; exit 1; }
+          [[ "$publish_url" == */repository/* ]] || { echo "publish_to must use a Nexus repository URL" >&2; exit 1; }
+
+          nexus_url="${publish_url%%/repository/*}"
+          repository="${publish_url#*/repository/}"
+          repository="${repository%%/*}"
+          [[ "$repository" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid Nexus repository name" >&2; exit 1; }
+          archive="${package_name}-${package_version}.tar.gz"
+
+          git archive --format=tar HEAD | gzip -n > "$archive"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "nexus_url=$nexus_url" >> "$GITHUB_OUTPUT"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package to Nexus
+        shell: bash
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+          NEXUS_URL: ${{ steps.package.outputs.nexus_url }}
+          NEXUS_REPOSITORY: ${{ steps.package.outputs.repository }}
+        run: |
+          : "${NEXUS_USERNAME:?Add the NEXUS_USERNAME GitHub Actions secret}"
+          : "${NEXUS_PASSWORD:?Add the NEXUS_PASSWORD GitHub Actions secret}"
+
+          curl --fail --silent --show-error \
+            --user "$NEXUS_USERNAME:$NEXUS_PASSWORD" \
+            --form "pub.asset=@$ARCHIVE" \
+            --form "pub.name=$PACKAGE_NAME" \
+            --form "pub.version=$PACKAGE_VERSION" \
+            "$NEXUS_URL/service/rest/v1/components?repository=$NEXUS_REPOSITORY"

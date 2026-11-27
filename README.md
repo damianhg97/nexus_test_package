@@ -41,3 +41,15 @@ void main() {
    ```bash
    dart pub publish
    ```
+
+### Publish from GitHub Actions with a Nexus username and password
+
+The `Publish to Nexus` workflow validates the package and uploads its archive
+through the Nexus Components REST API. To enable it:
+
+1. Add repository Actions secrets named `NEXUS_USERNAME` and `NEXUS_PASSWORD`.
+2. Push a commit to `main`, or in GitHub open **Actions** → **Publish to Nexus** → **Run workflow**.
+
+The workflow uses the `publish_to` URL and package name/version from
+`pubspec.yaml`. Bump the package version before each publish; Nexus rejects a
+version that already exists.
